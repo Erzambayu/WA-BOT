@@ -1,0 +1,69 @@
+{
+  "name": "whatsapp-bot",
+  "version": "2.0.0",
+  "description": "WhatsApp Bot Baileys dgn AI, finance tracker (PDF/CSV/chart), islamic tools (jadwal sholat, qibla, hadits), sticker maker (text/brat/animated), modular & full overhaul.",
+  "main": "src/bot.js",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "start": "node src/bot.js",
+    "migrate": "node scripts/migrate_to_database.js",
+    "backup": "node scripts/migrate_to_database.js --backup-only",
+    "restore": "node scripts/migrate_to_database.js --restore",
+    "dev": "nodemon src/bot.js",
+    "health": "node scripts/health_check.js --once",
+    "monitor": "node scripts/health_check.js",
+    "bg": "nohup node src/bot.js > bot_output.log 2>&1 & echo 'Bot started in background'",
+    "logs": "tail -f bot_output.log",
+    "test:prayer": "node scripts/test_prayer_notification.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "archiver": "^7.0.1",
+    "axios": "^1.7.7",
+    "better-sqlite3": "^11.3.0",
+    "canvas": "^2.11.2",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.4.5",
+    "extract-zip": "^2.0.1",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.5.45",
+    "ms": "^2.1.3",
+    "ora": "^8.1.1",
+    "pdfkit": "^0.15.0",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.2.2",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.33.5",
+    "winston": "^3.14.2",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.12.0",
+    "eslint": "^9.12.0",
+    "globals": "^15.10.0",
+    "nodemon": "^3.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "WA-Bot Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/whatsapp-bot.git"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "ai",
+    "chatbot",
+    "automation",
+    "finance",
+    "islamic",
+    "sticker"
+  ]
+}

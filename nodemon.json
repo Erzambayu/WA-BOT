@@ -1,0 +1,10 @@
+{
+  "ignore": [
+    "auth_info_baileys/*",
+    "auth_info_baileys_new/*",
+    "node_modules/*",
+    "data/*",
+    "config/*"
+  ],
+  "watch": ["src/", "modules/"]
+} 
