@@ -1,4 +1,3 @@
-global.crypto = require('crypto');
 const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const sharp = require('sharp');
@@ -21,15 +20,9 @@ const { getUserSummary, saveUserSummary, summarizeUserHistoryWithLLM, getUserFac
 require('dotenv').config();
 
 const BOT_NUMBER = process.env.BOT_NUMBER || 'your_bot_number@s.whatsapp.net';
-const ADMIN_FILE = path.join(__dirname, '../config/admins.json');
 const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY || 'your_openweather_api_key_here';
-const DEFAULT_SHOLAT_CITY_FILE = path.join(__dirname, '../config/sholat_city.json');
-const BIRTHDAY_FILE = path.join(__dirname, '../config/birthdays.json');
-const LOG_FILE = path.join(__dirname, '../data/bot.log');
-const SCHEDULED_FILE = path.join(__dirname, '../config/scheduled_messages.json');
-const LAST_TARGET_FILE = path.join(__dirname, '../config/last_target.json');
+const LOG_FILE = process.env.LOG_FILE_PATH || path.join(__dirname, '../data/bot.log');
 const LOG_LEVEL = process.env.LOG_LEVEL || 'info'; // Pilihan: 'error', 'warn', 'success', 'info', 'all'
-const MAINTENANCE_FILE = path.join(__dirname, '../config/maintenance.json');
 
 // Tambahkan setelah deklarasi variabel global
 const WELCOMED_USERS = new Set();
@@ -1499,6 +1492,51 @@ process.on('uncaughtException', (err) => {
     logError('Uncaught Exception: ' + (err?.message || String(err)), 'PROCESS');
     // Jangan exit kecuali fatal init error
 });
+
+// Graceful shutdown handler
+let shutdownInProgress = false;
+async function gracefulShutdown(signal) {
+    if (shutdownInProgress) return;
+    shutdownInProgress = true;
+    logInfo(`Received ${signal}. Shutting down gracefully...`, 'SHUTDOWN');
+    console.log(chalk.yellow(`\n🛑 Received ${signal}. Cleaning up...`));
+
+    // Clear all scheduled timers
+    if (scheduledTimeouts) {
+        for (const key of Object.keys(scheduledTimeouts)) {
+            if (scheduledTimeouts[key]) {
+                clearTimeout(scheduledTimeouts[key]);
+                delete scheduledTimeouts[key];
+            }
+        }
+    }
+    console.log(chalk.green('   ✅ Timers cleared'));
+
+    // Save AI memory cache
+    try {
+        if (global.userAIMemory) {
+            writeUserAIMemory(global.userAIMemory);
+        }
+        console.log(chalk.green('   ✅ AI memory saved'));
+    } catch (e) {
+        logError('Failed to save AI memory during shutdown: ' + e.message, 'SHUTDOWN');
+    }
+
+    // Close DB connections gracefully
+    try {
+        const utils = require('../modules/utils');
+        if (utils.botDb && typeof utils.botDb.close === 'function') {
+            // botDb is shared singleton — don't close to avoid crashing in-flight ops
+        }
+    } catch (e) { /* ignore */ }
+
+    logInfo('Graceful shutdown complete. Bye! 👋', 'SHUTDOWN');
+    console.log(chalk.green('   ✅ Shutdown complete. Bye! 👋'));
+    process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Load AI memory saat startup
 (async () => {
