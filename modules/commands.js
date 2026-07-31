@@ -529,15 +529,25 @@ async function handleCommand({ command, args, sock, sender, senderNum, msg, isFr
                 return true;
 
             case 'cekwa':
-                if (args.length < 2) return await sock.sendMessage(sender, { text: utils.errorMsg('ðŸ“ž *WhatsApp Number Checker* ðŸ”\n\nPlease provide a phone number to check!\n\nðŸ“‹ *Format:* `/cekwa <nomor>`\n\nðŸ’¡ *Examples:*\nâ€¢ `/cekwa 6281234567890`\nâ€¢ `/cekwa +6281234567890`\nâ€¢ `/cekwa 081234567890`\n\nâœ… *What this checks:*\nâ€¢ If number is registered on WhatsApp\nâ€¢ Account status (active/inactive)\nâ€¢ Profile availability\n\nðŸ”’ Privacy respected - no personal data accessed!') });
+                if (args.length < 2) return await sock.sendMessage(sender, { text: utils.errorMsg('📱 *WhatsApp Number Checker*\n\nFormat: `/cekwa <nomor>`\n\nContoh:\n• `/cekwa 6281234567890`\n• `/cekwa 081234567890`') });
                 const nomor = args[1].replace(/\D/g, '');
+                if (!/^[1-9]\d{6,14}$/.test(nomor)) return await sock.sendMessage(sender, { text: utils.errorMsg('Nomor tidak valid. Gunakan format 628xxx atau 08xxx.') });
                 try {
-                    // Placeholder for actual WhatsApp check logic
-                    await sock.sendMessage(sender, { text: 'ðŸ“ž *WhatsApp Status Check* ðŸ”\n\nðŸ”„ *Checking number...*\n\nSorry, this feature is currently under development!\n\nðŸš§ *Coming soon:*\nâ€¢ Real-time WhatsApp status check\nâ€¢ Account verification\nâ€¢ Profile status detection\n\nðŸ’¡ *Alternative:*\nTry sending a test message to verify manually!\n\nðŸ› ï¸ Feature will be available in next update!' });
+                    const jids = [`${nomor}@s.whatsapp.net`];
+                    const result = await sock.onWhatsApp(...jids);
+                    if (result && result.length > 0 && result[0].exists) {
+                        const jid = result[0].jid;
+                        await sock.sendMessage(sender, { text: `✅ *Nomor ${nomor} terdaftar di WhatsApp*\n\n📱 JID: \`${jid}\`\n🟢 Status: Aktif` });
+                        botState.incrementSent();
+                    } else {
+                        await sock.sendMessage(sender, { text: `❌ *Nomor ${nomor} tidak terdaftar di WhatsApp*\n\nPastikan nomor benar dan akun WhatsApp masih aktif.` });
+                    }
                 } catch (e) {
+                    logger.error('CekWA Error:', e);
+                    await sock.sendMessage(sender, { text: utils.errorMsg('Gagal mengecek nomor. Coba lagi.') });
                     botState.incrementError();
-                    botState.saveStats();
                 }
+                botState.saveStats();
                 return true;
 
             case 'stiker':

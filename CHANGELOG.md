@@ -1,4 +1,41 @@
-# CHANGELOG v2.0.0 — Full Overhaul (2026-05-21)
+# CHANGELOG v2.1.0 — Fixes & Improvements (2026-07-31)
+
+## 🔥 Fixes
+
+| # | Fix | Deskripsi |
+|---|---|---|
+| 1 | **`global.crypto` override removed** | Line 1 `bot.js` overwrite native Web Crypto API — dihapus karena gak dipake di manapun. Fixes [#1](https://github.com/Erzambayu/WA-BOT/issues/1) |
+| 2 | **Config paths dari env vars** | Hardcoded path file diganti jadi env-based (`CONFIG_DIR`, `DATA_DIR`, `LOG_FILE_PATH`). Dead code (ADMIN_FILE, BIRTHDAY_FILE, etc) dihapus dari bot.js karena udah pake DB. Fixes [#2](https://github.com/Erzambayu/WA-BOT/issues/2) |
+| 3 | **`/cekwa` beneran** | Sebelumnya cuma placeholder, sekarang pake `sock.onWhatsApp()` dari Baileys — langsung cek nomor terdaftar atau enggak |
+
+## ✨ New
+
+- **Graceful shutdown**: handle SIGINT/SIGTERM — clear timers, save AI memory, log bersih
+- **`LOG_FILE_PATH` env var**: bisa override path file log tanpa ubah kode
+
+## 📦 Dependencies
+
+| Package | v2.0.0 | v2.1.0 |
+|---|---|---|
+| `@whiskeysockets/baileys` | ^6.7.18 | ^6.7.24 |
+| `axios` | ^1.7.7 | ^1.19.0 |
+| `better-sqlite3` | ^11.3.0 | ^13.0.2 |
+| `dotenv` | ^16.4.5 | ^17.4.2 |
+| `moment-timezone` | ^0.5.45 | ^0.6.3 |
+| `ora` | ^8.1.1 | ^9.4.1 |
+| `pdfkit` | ^0.15.0 | ^0.19.1 |
+| `pino` | ^9.4.0 | ^10.3.1 |
+| `pino-pretty` | ^11.2.2 | ^13.1.3 |
+| `sharp` | ^0.33.5 | ^0.35.3 |
+| `winston` | ^3.14.2 | ^3.19.0 |
+| `eslint` | ^9.12.0 | ^9.26.0 |
+| `@eslint/js` | ^9.12.0 | ^9.26.0 |
+| `globals` | ^15.10.0 | ^16.2.0 |
+| `nodemon` | ^3.1.7 | ^3.1.10 |
+
+> ⚠️ `chalk` tetap v4 (CJS compatible), `canvas` tetap v2 (native binding stability)
+
+---\n\n# CHANGELOG v2.0.0 — Full Overhaul (2026-05-21)
 
 ## 🐛 Bug fatal yang di-fix
 
