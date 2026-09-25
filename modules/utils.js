@@ -242,6 +242,7 @@ function saveScheduledMessages(list) {
                     msg.created_by || 'system'
                 );
             }
+
         });
         
         tx(list);
@@ -249,6 +250,71 @@ function saveScheduledMessages(list) {
     } catch (error) {
         logError(`Error saving scheduled messages: ${error.message}`, 'DB');
         return false;
+    }
+}
+
+function createReminderJob({ target, message, delayMs, repeatMs = null, createdBy = 'user' }) {
+    if (!target || !message || !Number.isFinite(delayMs) || delayMs <= 0) {
+        throw new Error('Invalid reminder job');
+    }
+    const nextRunAt = Date.now() + delayMs;
+    try {
+        const result = botDb.prepare(`
+            INSERT INTO scheduled_messages
+                (target, message, schedule_time, repeat_type, created_by, is_active, next_run_at)
+            VALUES (?, ?, ?, ?, ?, 1, ?)
+        `).run(target, message, new Date(nextRunAt).toISOString(), repeatMs ? String(repeatMs) : null, createdBy, nextRunAt);
+        return result.lastInsertRowid;
+    } catch (error) {
+        logError(`Error creating reminder job: ${error.message}`, 'DB');
+        throw error;
+    }
+}
+
+function getDueReminderJobs(now = Date.now()) {
+    try {
+        return botDb.prepare(`
+            SELECT * FROM scheduled_messages
+            WHERE is_active = 1 AND next_run_at IS NOT NULL AND next_run_at <= ?
+            ORDER BY next_run_at ASC
+        `).all(now);
+    } catch (error) {
+        logError(`Error reading due reminder jobs: ${error.message}`, 'DB');
+        return [];
+    }
+}
+
+function getActiveReminderJobs() {
+    try {
+        return botDb.prepare(`
+            SELECT * FROM scheduled_messages
+            WHERE is_active = 1 AND next_run_at IS NOT NULL
+            ORDER BY next_run_at ASC
+        `).all();
+    } catch (error) {
+        logError(`Error reading active reminder jobs: ${error.message}`, 'DB');
+        return [];
+    }
+}
+
+function completeReminderJob(id, repeatMs = null) {
+    const nextRunAt = repeatMs ? Date.now() + repeatMs : null;
+    try {
+        botDb.prepare(`
+            UPDATE scheduled_messages
+            SET last_run_at = ?, next_run_at = ?, is_active = ?
+            WHERE id = ?
+        `).run(Date.now(), nextRunAt, repeatMs ? 1 : 0, id);
+    } catch (error) {
+        logError(`Error completing reminder job ${id}: ${error.message}`, 'DB');
+    }
+}
+
+function cancelReminderJob(id) {
+    try {
+        botDb.prepare('UPDATE scheduled_messages SET is_active = 0 WHERE id = ?').run(id);
+    } catch (error) {
+        logError(`Error cancelling reminder job ${id}: ${error.message}`, 'DB');
     }
 }
 
@@ -1141,9 +1207,19 @@ function ensureConfigFiles() {
                 repeat_type TEXT,
                 created_by TEXT,
                 is_active INTEGER DEFAULT 1,
+                next_run_at INTEGER,
+                last_run_at INTEGER,
+                last_error TEXT,
                 created_at INTEGER DEFAULT (strftime('%s', 'now'))
             )
         `);
+        for (const column of ['next_run_at', 'last_run_at', 'last_error']) {
+            try {
+                botDb.exec(`ALTER TABLE scheduled_messages ADD COLUMN ${column} ${column === 'last_error' ? 'TEXT' : 'INTEGER'}`);
+            } catch (error) {
+                if (!String(error.message).includes('duplicate column name')) throw error;
+            }
+        }
         
         botDb.exec(`
             CREATE TABLE IF NOT EXISTS events (
@@ -1271,6 +1347,8 @@ module.exports = {
     // Data management
     getBirthdays, saveBirthdays,
     getScheduledMessages, saveScheduledMessages,
+    createReminderJob, getDueReminderJobs, getActiveReminderJobs,
+    completeReminderJob, cancelReminderJob,
     getEvents, saveEvents,
     getUsers, saveUser,
     getGroups, saveGroup,

@@ -181,6 +181,9 @@ npm run monitor
 # test prayer API (validasi aladhan + myquran)
 npm run test:prayer
 
+# unit test parser dan utility tanpa koneksi WhatsApp
+npm test
+
 # lint
 npm run lint
 npm run lint:fix
@@ -368,6 +371,7 @@ Bot pake **2 SQLite database** dengan WAL mode:
 ### Single source of truth
 - **OWNER_NUMBER**: env-driven (bukan hardcoded lagi)
 - **Maintenance status**: `bot_settings.maintenance_mode` di DB (bukan JSON)
+- **Reminder**: job `/remind` dan `/remindme` disimpan di `scheduled_messages`, dipulihkan saat bot reconnect/startup, dan tidak hilang saat proses restart.
 - **Logger**: winston (rotating daily) + chalk console
 - **Schedulers idempotent**: cuma init sekali walau reconnect berkali-kali
 

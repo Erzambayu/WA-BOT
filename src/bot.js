@@ -15,6 +15,7 @@ require('winston-daily-rotate-file');
 const moment = require('moment-timezone');
 const { getHutang, getHutangReminder, saveHutangReminder } = require('../modules/utils');
 const { getUserSummary, saveUserSummary, summarizeUserHistoryWithLLM, getUserFacts } = require('../modules/utils');
+const { parseCommandText, getMessageText } = require('../modules/command_parser');
 
 // Load environment variables
 require('dotenv').config();
@@ -792,6 +793,40 @@ let reconnectAttempts = 0;
 let maxReconnectAttempts = 5;
 let isReconnecting = false;
 
+function schedulePersistentReminder(jobId, sock, delayOverride = null) {
+    const job = utils.getActiveReminderJobs().find(item => Number(item.id) === Number(jobId));
+    if (!job) return;
+    const key = `persistentReminder:${job.id}`;
+    if (scheduledTimeouts[key]) clearTimeout(scheduledTimeouts[key]);
+    const delay = delayOverride === null
+        ? Math.max(0, Number(job.next_run_at) - Date.now())
+        : delayOverride;
+    scheduledTimeouts[key] = setTimeout(async () => {
+        try {
+            if (!connectionReady) {
+                schedulePersistentReminder(job.id, sock, 30000);
+                return;
+            }
+            await safeSendMessage(sock, job.target, { text: `⏰ Pengingat: ${job.message}` });
+            utils.completeReminderJob(job.id, job.repeat_type ? Number(job.repeat_type) : null);
+            botStats.sent++;
+            saveStats();
+        } catch (error) {
+            logError(`Persistent reminder ${job.id} failed: ${error.message}`, 'SCHEDULER');
+            schedulePersistentReminder(job.id, sock, 30000);
+            return;
+        }
+        delete scheduledTimeouts[key];
+        if (job.repeat_type) schedulePersistentReminder(job.id, sock);
+    }, delay);
+}
+
+function recoverPersistentReminders(sock) {
+    const jobs = utils.getActiveReminderJobs();
+    for (const job of jobs) schedulePersistentReminder(job.id, sock);
+    logInfo(`Recovered ${jobs.length} persistent reminder job(s)`, 'SCHEDULER');
+}
+
 // Cleanup function untuk membersihkan session lama (timer scheduler PERSIST antar reconnect)
 function cleanupBeforeStart() {
     try {
@@ -804,6 +839,7 @@ function cleanupBeforeStart() {
                     clearTimeout(scheduledTimeouts[key]);
                     delete scheduledTimeouts[key];
                 }
+
             }
         }
 
@@ -903,6 +939,7 @@ async function startBot() {
             keepAliveIntervalMs: 30000,
             markOnlineOnConnect: true
         });
+        scheduledTimeouts.schedulePersistentReminder = (jobId) => schedulePersistentReminder(jobId, sock);
 
         sock.ev.on('creds.update', saveCreds);
 
@@ -944,6 +981,7 @@ async function startBot() {
                     console.log(chalk.green('   ✅ Weather notifications activated'));
 
                     scheduleHutangReminder(sock);
+                    recoverPersistentReminders(sock);
                     console.log(chalk.green('   ✅ Debt reminders activated'));
 
                     const admins = getAdmins();
@@ -1136,7 +1174,7 @@ Bot is running with enhanced security protocols. All admin privileges are active
             console.log('DEBUG event handler sender:', sender, typeof sender);
 
             // === INTERCEPT AI MODE (tanpa command) ===
-            const textMsg = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption;
+            const textMsg = getMessageText(msg.message);
             // Baca state dari file
             const userAIMode = readUserAIMode();
             const userAIMemory = await readUserAIMemory();
@@ -1298,11 +1336,7 @@ Bot is running with enhanced security protocols. All admin privileges are active
 
             // === COMMAND HANDLER ===
             if (msg.message.conversation) {
-                const textMsg = msg.message.conversation;
-                const parts = textMsg.trim().split(/\s+/);
-                const commandRaw = parts[0].toLowerCase();
-                const command = commandRaw.startsWith('/') ? commandRaw.slice(1) : commandRaw;
-                const args = parts.slice(1);
+                const { command, args } = parseCommandText(msg.message.conversation);
                 logInfo(chalk.magenta(`[CMD] [${command}] dari ${senderNum}`), 'COMMAND');
                 // REACTION: Pesan diterima
                 try { await sock.sendMessage(sender, { react: { text: '👀', key: msg.key } }); } catch {}
@@ -1325,11 +1359,7 @@ Bot is running with enhanced security protocols. All admin privileges are active
             }
             // === COMMAND HANDLER UNTUK REPLY/EXTENDED TEXT ===
             if (msg.message.extendedTextMessage && msg.message.extendedTextMessage.text) {
-                const textMsg = msg.message.extendedTextMessage.text;
-                const parts = textMsg.trim().split(/\s+/);
-                const commandRaw = parts[0].toLowerCase();
-                const command = commandRaw.startsWith('/') ? commandRaw.slice(1) : commandRaw;
-                const args = parts.slice(1);
+                const { command, args } = parseCommandText(msg.message.extendedTextMessage.text);
                 logInfo(chalk.magenta(`[CMD] [${command}] dari ${senderNum} (reply/forward)`), 'COMMAND');
                 // REACTION: Pesan diterima
                 try { await sock.sendMessage(sender, { react: { text: '👀', key: msg.key } }); } catch {}
@@ -1352,11 +1382,7 @@ Bot is running with enhanced security protocols. All admin privileges are active
             }
             // === COMMAND HANDLER UNTUK GAMBAR DENGAN CAPTION ===
             if (msg.message.imageMessage && msg.message.imageMessage.caption) {
-                const textMsg = msg.message.imageMessage.caption;
-                const parts = textMsg.trim().split(/\s+/);
-                const commandRaw = parts[0].toLowerCase();
-                const command = commandRaw.startsWith('/') ? commandRaw.slice(1) : commandRaw;
-                const args = parts.slice(1);
+                const { command, args } = parseCommandText(msg.message.imageMessage.caption);
                 logInfo(chalk.magenta(`[CMD] [${command}] dari ${senderNum} (caption gambar)`), 'COMMAND');
                 // REACTION: Pesan diterima
                 try { await sock.sendMessage(sender, { react: { text: '👀', key: msg.key } }); } catch {}
