@@ -5,6 +5,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const axios = require('axios');
 const { exec } = require('child_process');
+const os = require('os');
 
 const CONFIG = {
     BOT_DB_PATH: path.join(__dirname, '../config/bot_data.db'),
@@ -46,6 +47,13 @@ class HealthMonitor {
     }
 
     async checkProcessStatus() {
+        if (process.platform === 'win32') {
+            return {
+                status: 'warning',
+                message: 'External bot process inspection is unavailable on Windows',
+                data: { pid: process.pid, note: 'Use Task Manager or a service monitor for process-level status.' }
+            };
+        }
         return new Promise((resolve) => {
             exec(`ps aux | grep "${CONFIG.PROCESS_NAME}" | grep -v grep`, (error, stdout) => {
                 if (error || !stdout.trim()) {
@@ -244,6 +252,22 @@ class HealthMonitor {
     }
 
     async checkMemoryUsage() {
+        if (process.platform === 'win32') {
+            const total = os.totalmem();
+            const free = os.freemem();
+            const used = total - free;
+            const usagePercent = ((used / total) * 100).toFixed(2);
+            return {
+                status: usagePercent > 90 ? 'critical' : usagePercent > 80 ? 'warning' : 'healthy',
+                message: `System memory usage: ${usagePercent}%`,
+                data: {
+                    total: `${(total / 1024 / 1024).toFixed(0)}MB`,
+                    used: `${(used / 1024 / 1024).toFixed(0)}MB`,
+                    free: `${(free / 1024 / 1024).toFixed(0)}MB`,
+                    usage: `${usagePercent}%`
+                }
+            };
+        }
         return new Promise((resolve) => {
             exec('free -m', (error, stdout) => {
                 if (error) {

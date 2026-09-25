@@ -505,12 +505,16 @@ async function handleCommand({ command, args, sock, sender, senderNum, msg, isFr
                 const pesan = args.slice(2).join(' ');
                 const msTime = ms(waktu);
                 if (!msTime) return await sock.sendMessage(sender, { text: utils.errorMsg('Format waktu tidak valid.') });
+                const reminderJobId = utils.createReminderJob({
+                    target: sender,
+                    message: pesan,
+                    delayMs: msTime,
+                    createdBy: senderNum
+                });
                 await sock.sendMessage(sender, { text: `Pengingat akan dikirim dalam ${waktu}: ${pesan}` });
-                setTimeout(() => {
-                    sock.sendMessage(sender, { text: `Pengingat: ${pesan}` });
-                    botState.incrementSent();
-                    botState.saveStats();
-                }, msTime);
+                if (scheduledTimeouts?.schedulePersistentReminder) {
+                    scheduledTimeouts.schedulePersistentReminder(reminderJobId);
+                }
                 return true;
 
             case 'remindme':
@@ -519,13 +523,18 @@ async function handleCommand({ command, args, sock, sender, senderNum, msg, isFr
                 const pesanInterval = args.slice(2).join(' ');
                 const msTimeInterval = ms(interval);
                 if (!msTimeInterval) return await sock.sendMessage(sender, { text: utils.errorMsg('Format interval tidak valid.') });
+                const recurringJobId = utils.createReminderJob({
+                    target: sender,
+                    message: pesanInterval,
+                    delayMs: msTimeInterval,
+                    repeatMs: msTimeInterval,
+                    createdBy: senderNum
+                });
                 await sock.sendMessage(sender, { text: `Reminder berulang setiap ${interval}: ${pesanInterval}` });
-                const intervalId = setInterval(() => {
-                    sock.sendMessage(sender, { text: `Reminder: ${pesanInterval}` });
-                    botState.incrementSent();
-                    botState.saveStats();
-                }, msTimeInterval);
-                reminderManager.addReminder(senderNum, intervalId, { interval, pesan: pesanInterval });
+                if (scheduledTimeouts?.schedulePersistentReminder) {
+                    scheduledTimeouts.schedulePersistentReminder(recurringJobId);
+                }
+                reminderManager.addReminder(senderNum, recurringJobId, { interval, pesan: pesanInterval });
                 return true;
 
             case 'cekwa':

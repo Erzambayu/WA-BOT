@@ -15,6 +15,7 @@
     "bg": "nohup node src/bot.js > bot_output.log 2>&1 & echo 'Bot started in background'",
     "logs": "tail -f bot_output.log",
     "test:prayer": "node scripts/test_prayer_notification.js",
+    "test": "node --test test/**/*.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
